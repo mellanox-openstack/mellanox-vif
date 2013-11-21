@@ -15,7 +15,7 @@
 
 import setuptools
 
-Name = 'mlnxif'
+Name = 'mlnxvif'
 Url = ""
 Version = 0.5
 License = 'Apache License 2.0'
