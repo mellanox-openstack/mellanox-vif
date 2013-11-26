@@ -21,7 +21,7 @@ from nova.openstack.common import log as logging
 from nova import utils
 from nova.openstack.common.gettextutils import _
 from nova.virt.libvirt import vif
-from nova.virt.libvirt.mlnx import config  as mlxconfig
+from mlnxvif import config  as mlxconfig
 
 LOG = logging.getLogger(__name__)
 HEX_BASE = 16
