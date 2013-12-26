@@ -18,6 +18,7 @@
 import re
 from nova import exception
 from nova.openstack.common import log as logging
+from nova.openstack.common import processutils
 from nova import utils
 from nova.openstack.common.gettextutils import _
 from nova.virt.libvirt import vif
@@ -56,10 +57,11 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
                 dev_name = None
                 try:
                     res = utils.execute('ebrctl', 'allocate-port',
-                                        vnic_mac, device_id, fabric, vif_type)
+                                        vnic_mac, device_id, fabric,
+                                        vif_type, run_as_root=True)
                     dev = res[0].strip()
 
-                except exception.ProcessExecutionError:
+                except processutils.ProcessExecutionError:
                     LOG.exception(_("Failed while config vif"),
                                   instance=instance)
                     dev = None
@@ -92,7 +94,8 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
         try:
             if vif_type == VIF_TYPE_HOSTDEV:
                 dev = utils.execute('ebrctl', 'add-port', vnic_mac, device_id,
-                                    fabric, vif_type, dev_name)
+                                    fabric, vif_type, dev_name,
+                                    run_as_root=True)
                 if dev is None:
                     error_msg = "Cannot plug VIF with no allocated device "
                     raise exception.NovaException(_(error_msg))
@@ -115,7 +118,7 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
 
         try:
             if vif_type == VIF_TYPE_HOSTDEV:
-                utils.execute('ebrctl', 'del-port', fabric, vnic_mac)
+                utils.execute('ebrctl', 'del-port', fabric, vnic_mac, run_as_root=True)
             else:
                 self.libvirt_gen_drv.unplug(instance, vif)
         except Exception, e:
