@@ -44,85 +44,85 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
     def get_config(self, instance, vif, image_meta,
                    inst_type):
         vif_type = vif.get('type')
-        vnic_mac = vif['address']
-        device_id = instance['uuid']
-        network = vif['network']
-        fabric = network['meta']['physical_network']
-
-        if vif_type:
+        if vif_type is not VIF_TYPE_HOSTDEV:
+            conf = self.libvirt_gen_drv.get_config(instance, vif,
+                                                   image_meta, inst_type)
+        else:
             LOG.debug(_("vif_type=%s"), vif_type)
+            dev_name = None
+            dev = None
+            device_id = instance['uuid']
+            vnic_mac = vif['address']
+            network = vif['network']
+            fabric = network['meta'].get('physical_network')
 
-        try:
-            if vif_type == VIF_TYPE_HOSTDEV:
-                dev_name = None
-                try:
+            try:
+                if fabric:
                     res = utils.execute('ebrctl', 'allocate-port',
                                         vnic_mac, device_id, fabric,
                                         vif_type, run_as_root=True)
                     dev = res[0].strip()
+                else:
+                    LOG.warning(_("Fabric is expected.Got None."))
 
-                except processutils.ProcessExecutionError:
-                    LOG.exception(_("Failed while config vif"),
-                                  instance=instance)
-                    dev = None
-            else:
-                conf = self.libvirt_gen_drv.get_config(instance, vif,
-                                                       image_meta, inst_type)
-                return conf
-        except Exception as e:
-            LOG.debug("Error in get_config: %s", e)
-            raise exception.NovaException(_("Processing Failure during "
-                                            "vNIC allocation"))
-        #Allocation Failed
-        if dev is None:
-            raise exception.NovaException(_("Failed to allocate "
+            except processutils.ProcessExecutionError:
+                LOG.exception(_("Failed while config vif"),
+                              instance=instance)
+                raise exception.NovaException(_("Processing Failure during "
+                                                "vNIC allocation"))
+            #Allocation Failed
+            if dev is None:
+                raise exception.NovaException(_("Failed to allocate "
                                             "device for vNIC"))
-        conf = self.get_dev_config(vnic_mac, dev)
+            conf = self.get_dev_config(vnic_mac, dev)
         return conf
 
     def plug(self, instance, vif):
         vif_type = vif.get('type')
-        network = vif['network']
-        fabric = network['meta']['physical_network']
-        vnic_mac = vif['address']
-        device_id = instance['uuid']
-        dev_name = None
+        if vif_type is not VIF_TYPE_HOSTDEV:
+            self.libvirt_gen_drv.plug(instance, vif)
+        else:
+            try:
+                LOG.debug(_("vif_type=%s"), vif_type)
+                network = vif['network']
+                vnic_mac = vif['address']
+                device_id = instance['uuid']
+                dev_name = None
+                dev = None
+                fabric = network['meta'].get('physical_network')
 
-        if vif_type:
-            LOG.debug(_("vif_type=%s"), vif_type)
-
-        try:
-            if vif_type == VIF_TYPE_HOSTDEV:
-                dev = utils.execute('ebrctl', 'add-port', vnic_mac, device_id,
-                                    fabric, vif_type, dev_name,
-                                    run_as_root=True)
-                if dev is None:
-                    error_msg = "Cannot plug VIF with no allocated device "
-                    raise exception.NovaException(_(error_msg))
-            else:
-                self.libvirt_gen_drv.plug(instance, vif)
-
-        except Exception as e:
-            LOG.debug(_("Error in Plug: %s"), e)
-            raise exception.NovaException(_("Processing Failure "
-                                            "during vNIC plug"))
+                if fabric:
+                    dev = utils.execute('ebrctl', 'add-port', vnic_mac,
+                                        device_id, fabric, vif_type, dev_name,
+                                        run_as_root=True)
+                    if dev:
+                        return
+                    else:
+                        error_msg = "Cannot plug VIF with no allocated device"
+                else:
+                    error_msg = "Cannot plug VIF. Fabric is expected"
+                raise exception.NovaException(_(error_msg))
+            except Exception:
+                raise exception.NovaException(_("Processing Failure "
+                                                "during vNIC plug"))
 
     def unplug(self, instance, vif):
         vif_type = vif.get('type')
-        network = vif['network']
-        fabric = network['meta']['physical_network']
-        vnic_mac = vif['address']
-
-        if vif_type:
-            LOG.debug(_("vif_type=%s"), vif_type)
-
-        try:
-            if vif_type == VIF_TYPE_HOSTDEV:
-                utils.execute('ebrctl', 'del-port', fabric, vnic_mac, run_as_root=True)
-            else:
-                self.libvirt_gen_drv.unplug(instance, vif)
-        except Exception, e:
-            LOG.warning(_("Failed while unplugging vif %s"), e)
+        if vif_type is not VIF_TYPE_HOSTDEV:
+            self.libvirt_gen_drv.unplug(instance, vif)
+        else:
+            try:
+                LOG.debug(_("vif_type=%s"), vif_type)
+                network = vif['network']
+                vnic_mac = vif['address']
+                fabric = network['meta'].get('physical_network')
+                if fabric:
+                    utils.execute('ebrctl', 'del-port', fabric,
+                                  vnic_mac, run_as_root=True)
+                else:
+                    LOG.warning(_("Cannot unplug VIF. Fabric is expected"))
+            except Exception:
+                LOG.exception(_("Failed while unplugging vif"))
 
     def _str_to_hex(self, str_val):
         ret_val = hex(int(str_val, HEX_BASE))
