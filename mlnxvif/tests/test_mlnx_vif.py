@@ -119,31 +119,41 @@ class LibvirtVifTestCase(test.TestCase):
         return __inner
 
     def test_plug_mlnx_hostdev(self):
+        vif_gen = vif.LibvirtGenericVIFDriver
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
         with mock.patch.object(utils, 'execute') as execute:
-            d.plug(self.instance, self.vif_mlnx_hostdev)
+            with mock.patch.object(vif_gen, 'plug') as gen_plug:
+                d.plug(self.instance, self.vif_mlnx_hostdev)
+                self.assertEqual(gen_plug.call_count, 0)
 
     def test_unplug_mlnx_hostdev(self):
+        vif_gen = vif.LibvirtGenericVIFDriver
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
         with mock.patch.object(utils, 'execute') as execute:
-            d.unplug(None, self.vif_mlnx_hostdev)
+            with mock.patch.object(vif_gen, 'unplug') as gen_unplug:
+                d.unplug(self.instance, self.vif_mlnx_hostdev)
+                self.assertEqual(gen_unplug.call_count, 0)
 
     def test_plug_mlnx_hostdev_fabric_none(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
-        with testtools.ExpectedException(exception.NovaException):
+        with mock.patch('mlnxvif.vif.LOG') as log_mock:
             d.plug(self.instance, self.vif_mlnx_hostdev_none)
+            log_mock.warning.assert_called_with("Cannot plug VIF. "
+                                                "Fabric is expected")
 
     def test_plug_mlnx_hostdev_ovs_vif(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
         with mock.patch.object(vif.LibvirtGenericVIFDriver, 'plug') as plug:
             d.plug(self.instance, self.vif_ovs)
-        self.assertTrue(plug.called_once())
+        self.assertEqual(plug.call_count, 1)
 
     def test_plug_mlnx_hostdev_not_allocated(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
         with mock.patch.object(utils, 'execute', return_value=None) as execute:
-            with testtools.ExpectedException(exception.NovaException):
+            with mock.patch('mlnxvif.vif.LOG') as log_mock:
                 d.plug(self.instance, self.vif_mlnx_hostdev)
+                log_mock.warning.assert_called_with("Cannot plug VIF with "
+                                                    "no allocated device")
 
     def test_unplug_mlnx_hostdev_none(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))

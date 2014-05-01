@@ -44,7 +44,7 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
     def get_config(self, instance, vif, image_meta,
                    inst_type):
         vif_type = vif.get('type')
-        if vif_type is not VIF_TYPE_HOSTDEV:
+        if vif_type != VIF_TYPE_HOSTDEV:
             conf = self.libvirt_gen_drv.get_config(instance, vif,
                                                    image_meta, inst_type)
         else:
@@ -79,7 +79,7 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
 
     def plug(self, instance, vif):
         vif_type = vif.get('type')
-        if vif_type is not VIF_TYPE_HOSTDEV:
+        if vif_type != VIF_TYPE_HOSTDEV:
             self.libvirt_gen_drv.plug(instance, vif)
         else:
             try:
@@ -101,14 +101,13 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
                         error_msg = "Cannot plug VIF with no allocated device"
                 else:
                     error_msg = "Cannot plug VIF. Fabric is expected"
-                raise exception.NovaException(_(error_msg))
+                LOG.warning(_(error_msg))
             except Exception:
-                raise exception.NovaException(_("Processing Failure "
-                                                "during vNIC plug"))
+                LOG.exception(_("Processing Failure during vNIC plug"))
 
     def unplug(self, instance, vif):
         vif_type = vif.get('type')
-        if vif_type is not VIF_TYPE_HOSTDEV:
+        if vif_type != VIF_TYPE_HOSTDEV:
             self.libvirt_gen_drv.unplug(instance, vif)
         else:
             try:
