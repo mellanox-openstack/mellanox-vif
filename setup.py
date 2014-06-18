@@ -17,7 +17,7 @@ import setuptools
 
 Name = 'mlnxvif'
 Url = ""
-Version = 0.7
+Version = '2013.2.1'
 License = 'Apache License 2.0'
 Author = 'Mellanox'
 AuthorEmail = 'openstack@mellanox.com'
