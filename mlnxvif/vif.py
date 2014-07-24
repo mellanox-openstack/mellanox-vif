@@ -54,16 +54,16 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
             device_id = instance['uuid']
             vnic_mac = vif['address']
             network = vif['network']
-            fabric = network['meta'].get('physical_network')
+            fabric = vif.get_physical_network()
+            if not fabric:
+                raise exception.NetworkMissingPhysicalNetwork(
+                    network_uuid=vif['network']['id'])
 
             try:
-                if fabric:
-                    res = utils.execute('ebrctl', 'allocate-port',
-                                        vnic_mac, device_id, fabric,
-                                        vif_type, run_as_root=True)
-                    dev = res[0].strip()
-                else:
-                    LOG.warning(_("Fabric is expected.Got None."))
+                res = utils.execute('ebrctl', 'allocate-port',
+                                    vnic_mac, device_id, fabric,
+                                    vif_type, run_as_root=True)
+                dev = res[0].strip()
 
             except processutils.ProcessExecutionError:
                 LOG.exception(_("Failed while config vif"),
@@ -82,16 +82,18 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
         if vif_type != VIF_TYPE_HOSTDEV:
             self.libvirt_gen_drv.plug(instance, vif)
         else:
-            try:
                 LOG.debug(_("vif_type=%s"), vif_type)
                 network = vif['network']
                 vnic_mac = vif['address']
                 device_id = instance['uuid']
                 dev_name = None
                 dev = None
-                fabric = network['meta'].get('physical_network')
+                fabric = vif.get_physical_network()
+                if not fabric:
+                    raise exception.NetworkMissingPhysicalNetwork(
+                        network_uuid=vif['network']['id'])
 
-                if fabric:
+                try:
                     dev = utils.execute('ebrctl', 'add-port', vnic_mac,
                                         device_id, fabric, vif_type, dev_name,
                                         run_as_root=True)
@@ -99,29 +101,29 @@ class MlxEthVIFDriver(vif.LibvirtBaseVIFDriver):
                         return
                     else:
                         error_msg = "Cannot plug VIF with no allocated device"
-                else:
-                    error_msg = "Cannot plug VIF. Fabric is expected"
-                LOG.warning(_(error_msg))
-            except Exception:
-                LOG.exception(_("Processing Failure during vNIC plug"))
+                        LOG.warning(_(error_msg))
+                except Exception:
+                    LOG.exception(_("Processing Failure during vNIC plug"))
 
     def unplug(self, instance, vif):
         vif_type = vif.get('type')
         if vif_type != VIF_TYPE_HOSTDEV:
             self.libvirt_gen_drv.unplug(instance, vif)
         else:
-            try:
                 LOG.debug(_("vif_type=%s"), vif_type)
                 network = vif['network']
                 vnic_mac = vif['address']
-                fabric = network['meta'].get('physical_network')
-                if fabric:
+                fabric = vif.get_physical_network()
+
+                if not fabric:
+                   raise exception.NetworkMissingPhysicalNetwork(
+                        network_uuid=vif['network']['id'])
+
+                try:
                     utils.execute('ebrctl', 'del-port', fabric,
-                                  vnic_mac, run_as_root=True)
-                else:
-                    LOG.warning(_("Cannot unplug VIF. Fabric is expected"))
-            except Exception:
-                LOG.exception(_("Failed while unplugging vif"))
+                              vnic_mac, run_as_root=True)
+                except Exception:
+                    LOG.exception(_("Failed while unplugging vif"))
 
     def _str_to_hex(self, str_val):
         ret_val = hex(int(str_val, HEX_BASE))

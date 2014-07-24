@@ -75,6 +75,8 @@ class LibvirtVifTestCase(test.TestCase):
                                               interface='eth0')
 
     vif_mlnx_hostdev = network_model.VIF(id='vif-xxx-yyy-zzz',
+                                         details={'physical_network':
+                                                  'fake_phy_network'},
                                          address='ca:fe:de:ad:be:ef',
                                          network=network_mlnx,
                                          type=mlnx_vif.VIF_TYPE_HOSTDEV,
@@ -136,10 +138,10 @@ class LibvirtVifTestCase(test.TestCase):
 
     def test_plug_mlnx_hostdev_fabric_none(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
-        with mock.patch('mlnxvif.vif.LOG') as log_mock:
-            d.plug(self.instance, self.vif_mlnx_hostdev_none)
-            log_mock.warning.assert_called_with("Cannot plug VIF. "
-                                                "Fabric is expected")
+        with mock.patch.object(utils, 'execute') as execute:
+            self.assertRaises(exception.NetworkMissingPhysicalNetwork,
+                d.plug, self.instance, self.vif_mlnx_hostdev_none)
+            self.assertEqual(0, execute.call_count)
 
     def test_plug_mlnx_hostdev_ovs_vif(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
@@ -157,7 +159,7 @@ class LibvirtVifTestCase(test.TestCase):
 
     def test_unplug_mlnx_hostdev_none(self):
         d = mlnx_vif.MlxEthVIFDriver(self._get_conn(ver=9010))
-        with mock.patch('mlnxvif.vif.LOG') as log_mock:
-            d.unplug(self.instance, self.vif_mlnx_hostdev_none)
-            log_mock.warning.assert_called_with("Cannot unplug VIF. "
-                                                "Fabric is expected")
+        with mock.patch.object(utils, 'execute') as execute:
+            self.assertRaises(exception.NetworkMissingPhysicalNetwork,
+                d.unplug, self.instance, self.vif_mlnx_hostdev_none)
+            self.assertEqual(0, execute.call_count)
